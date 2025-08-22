@@ -35,12 +35,12 @@ const allowlist = [
 
 const corsOptions = {
   origin: (origin, cb) => {
-    // Allow non‑browser clients (curl/Postman/no Origin)
-    if (!origin) return cb(null, true);
-    cb(null, allowlist.includes(origin));
+    if (!origin) return cb(null, true);                 // allow tools like curl/postman
+    cb(null, allowlist.includes(origin));               // echo origin if in allowlist
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,                                    // <-- add this
+  methods: ['GET','POST','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
   maxAge: 86400,
 };
 app.use(cors(corsOptions));
