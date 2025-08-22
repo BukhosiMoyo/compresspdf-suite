@@ -13,46 +13,59 @@ import archiver from 'archiver';
 import { promises as fsp } from 'fs';
 
 import { mergeRouter } from './routes/merge.js';
-import { emailRouter } from "./routes/email.js";
-
+import { emailRouter } from './routes/email.js';
 
 dotenv.config();
 
-// --- CORS allowlist ---
+// ----------------------------------------------------------------------------
+// App & logger
+// ----------------------------------------------------------------------------
+const app = express();
+const log = pino();
+
+// ----------------------------------------------------------------------------
+/** CORS allowlist (add future tool domains as you launch them) */
+// ----------------------------------------------------------------------------
 const allowlist = [
   'https://mergepdf.co.za',
   'https://www.mergepdf.co.za',
   'https://compresspdf.co.za',
   'https://www.compresspdf.co.za',
-  // add future tool domains here
 ];
 
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // allow curl/postman/no-origin
+    // Allow non‑browser clients (curl/Postman/no Origin)
+    if (!origin) return cb(null, true);
     cb(null, allowlist.includes(origin));
   },
-  methods: ['GET','POST','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   maxAge: 86400,
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
-
-// --- paths / dirs ------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Paths / dirs
+// ----------------------------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DATA_DIR = path.join(__dirname, '../data');
-const UP_DIR = path.join(__dirname, '../uploads');
-const TMP_DIR = path.join(__dirname, '../tmp');
+const DATA_DIR  = path.join(__dirname, '../data');
+const UP_DIR    = path.join(__dirname, '../uploads');
+const TMP_DIR   = path.join(__dirname, '../tmp');
 const INDEX_DIR = path.join(TMP_DIR, 'index');
 
-[DATA_DIR, UP_DIR, TMP_DIR, INDEX_DIR].forEach(p => fs.mkdirSync(p, { recursive: true }));
+[DATA_DIR, UP_DIR, TMP_DIR, INDEX_DIR].forEach(p =>
+  fs.mkdirSync(p, { recursive: true })
+);
 
-// --- very simple stats (compressed counter) ----------------------------------
+// ----------------------------------------------------------------------------
+// Simple stats
+// ----------------------------------------------------------------------------
 const COUNTER_PATH = path.join(DATA_DIR, 'stats.json');
+
 async function readCounter() {
   try { return JSON.parse(await fsp.readFile(COUNTER_PATH, 'utf8')); }
   catch { return { total_compressed: 0, updated_at: new Date().toISOString() }; }
@@ -69,56 +82,66 @@ async function bumpTotal() {
   return s;
 }
 
-// --- very simple reviews aggregate ------------------------------------------
+// ----------------------------------------------------------------------------
+// Reviews aggregate
+// ----------------------------------------------------------------------------
 const REVIEWS_PATH = path.join(DATA_DIR, 'reviews.json');
+
 async function readReviews() {
   try { return JSON.parse(await fsp.readFile(REVIEWS_PATH, 'utf8')); }
-  catch { return { count: 0, sum: 0, distribution: { '1':0,'2':0,'3':0,'4':0,'5':0 }, updated_at: new Date().toISOString() }; }
+  catch {
+    return {
+      count: 0,
+      sum: 0,
+      distribution: { '1':0,'2':0,'3':0,'4':0,'5':0 },
+      updated_at: new Date().toISOString()
+    };
+  }
 }
 async function writeReviews(obj) {
   await fsp.mkdir(DATA_DIR, { recursive: true });
   await fsp.writeFile(REVIEWS_PATH, JSON.stringify(obj), 'utf8');
 }
 
-const app = express();
-const log = pino();
-
-// --- middleware --------------------------------------------------------------
-app.use(cors({
-  origin: (origin, cb) => cb(null, true),
-  credentials: true
-}));
+// ----------------------------------------------------------------------------
+// Body parsing & static
+// ----------------------------------------------------------------------------
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve merged outputs so browser can download /outputs/merged-*.pdf
 app.use('/outputs', express.static(path.join(__dirname, '..', 'outputs')));
 
-// Mount /v1/pdf/merge (implemented in routes/merge.js)
-app.use('/v1/pdf', mergeRouter);
-
-// Logs
+// ----------------------------------------------------------------------------
+// Health & logs
+// ----------------------------------------------------------------------------
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
-// --- health & stats ----------------------------------------------------------
 app.get('/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime(), ts: new Date().toISOString() });
 });
 
+// ----------------------------------------------------------------------------
+// Stats & reviews endpoints
+// ----------------------------------------------------------------------------
 app.get('/v1/stats/summary', async (_req, res) => {
   try { res.json(await readCounter()); }
   catch (e) { res.status(500).json({ error: { code: 'stats_read_failed', message: e.message } }); }
 });
 
-// Reviews (aggregate only)
 app.get('/v1/reviews/summary', async (_req, res) => {
   try {
     const r = await readReviews();
     const avg = r.count ? (r.sum / r.count) : 0;
-    res.json({ reviewCount: r.count, ratingValue: Number(avg.toFixed(2)), distribution: r.distribution, updated_at: r.updated_at });
+    res.json({
+      reviewCount: r.count,
+      ratingValue: Number(avg.toFixed(2)),
+      distribution: r.distribution,
+      updated_at: r.updated_at
+    });
   } catch (e) {
     res.status(500).json({ error: { code: 'reviews_read_failed', message: e.message } });
   }
@@ -143,23 +166,33 @@ app.post('/v1/reviews', async (req, res) => {
   }
 });
 
-// --- compression route (Ghostscript) ----------------------------------------
-const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+// ----------------------------------------------------------------------------
+// Upload limits / Multer config (align with Apache LimitRequestBody)
+// ----------------------------------------------------------------------------
+const MB = 1024 * 1024;
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 100); // default 100 MB
+const MAX_SIZE = MAX_UPLOAD_MB * MB;
+
 const storage = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, UP_DIR),
-  filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+  destination: (_req, _file, cb) => cb(null, UP_DIR),
+  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
+
 const upload = multer({
   storage,
   limits: { fileSize: MAX_SIZE },
-  fileFilter: (_, file, cb) => {
-    if (!file.mimetype.includes('pdf') && !file.originalname.toLowerCase().endsWith('.pdf')) {
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.includes('pdf') &&
+        !file.originalname.toLowerCase().endsWith('.pdf')) {
       return cb(new Error('invalid_file_type'));
     }
     cb(null, true);
   }
 });
 
+// ----------------------------------------------------------------------------
+// Compression route (Ghostscript) — still used by the compress app
+// ----------------------------------------------------------------------------
 function gsArgs(input, output, quality = 'printer', dpi = 150, removeMeta = false) {
   const base = [
     '-sDEVICE=pdfwrite',
@@ -242,6 +275,9 @@ app.post('/v1/pdf/compress', upload.single('file'), async (req, res) => {
   }
 });
 
+// ----------------------------------------------------------------------------
+// Shared download + zip endpoints (used by both apps)
+// ----------------------------------------------------------------------------
 app.get('/v1/jobs/:jobId/download', (req, res) => {
   const { jobId } = req.params;
   const { token } = req.query;
@@ -313,10 +349,15 @@ app.post('/v1/jobs/zip', express.json(), async (req, res) => {
   }
 });
 
-app.use("/v1/email", emailRouter);
+// ----------------------------------------------------------------------------
+// Mount feature routers
+// ----------------------------------------------------------------------------
+app.use('/v1/pdf', mergeRouter);
+app.use('/v1/email', emailRouter);
 
-
-// cleanup
+// ----------------------------------------------------------------------------
+// Cleanup expired temp files
+// ----------------------------------------------------------------------------
 setInterval(() => {
   try {
     if (!fs.existsSync(INDEX_DIR)) return;
@@ -329,10 +370,12 @@ setInterval(() => {
   } catch (e) { log.error(e); }
 }, 60_000);
 
-// --- Multer / generic error handler (must be after routes) ---
-app.use((err, req, res, next) => {
-  // Multer file-too-large
-  if (err && err.code === 'LIMIT_FILE_SIZE') {
+// ----------------------------------------------------------------------------
+// Multer / generic error handler (after routes)
+// ----------------------------------------------------------------------------
+app.use((err, _req, res, next) => {
+  // Multer: file too large
+  if (err && (err.code === 'LIMIT_FILE_SIZE')) {
     return res.status(413).json({
       error: {
         code: 'file_too_large',
@@ -343,7 +386,7 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // Multer invalid type (from your fileFilter)
+  // Multer: invalid type from fileFilter
   if (err && err.message === 'invalid_file_type') {
     return res.status(400).json({
       error: { code: 'invalid_file_type', message: 'Only .pdf files are allowed.' }
@@ -360,6 +403,8 @@ app.use((err, req, res, next) => {
   next();
 });
 
-
+// ----------------------------------------------------------------------------
+// Listen (bind localhost; Apache proxies HTTPS → 127.0.0.1:4000)
+// ----------------------------------------------------------------------------
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => log.info(`API up on :${PORT}`));
+app.listen(PORT, '127.0.0.1', () => log.info(`API up on :${PORT}`));
