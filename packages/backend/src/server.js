@@ -44,8 +44,7 @@ const corsOptions = {
   maxAge: 86400,
 };
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-
+app.options('(.*)', cors(corsOptions));  // Express 5 compatible
 // ----------------------------------------------------------------------------
 // Paths / dirs
 // ----------------------------------------------------------------------------
