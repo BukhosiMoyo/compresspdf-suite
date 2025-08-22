@@ -13,3 +13,4 @@ git subtree split --prefix=apps/merge-pdf-react -b publish/merge-pdf-react
 echo "Pushing to GitHub repo (main)…"
 git push -f https://github.com/BukhosiMoyo/merge-pdf-react.git publish/merge-pdf-react:main
 echo "Done."
+    

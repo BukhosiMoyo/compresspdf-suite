@@ -18,6 +18,28 @@ import { emailRouter } from "./routes/email.js";
 
 dotenv.config();
 
+// --- CORS allowlist ---
+const allowlist = [
+  'https://mergepdf.co.za',
+  'https://www.mergepdf.co.za',
+  'https://compresspdf.co.za',
+  'https://www.compresspdf.co.za',
+  // add future tool domains here
+];
+
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // allow curl/postman/no-origin
+    cb(null, allowlist.includes(origin));
+  },
+  methods: ['GET','POST','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  maxAge: 86400,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+
 // --- paths / dirs ------------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
