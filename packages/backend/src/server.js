@@ -21,6 +21,8 @@ dotenv.config();
 // App & logger
 // ----------------------------------------------------------------------------
 const app = express();
+app.set('trust proxy', true);
+
 const log = pino();
 
 // ----------------------------------------------------------------------------
@@ -144,6 +146,32 @@ app.get('/v1/reviews/summary', async (_req, res) => {
     res.status(500).json({ error: { code: 'reviews_read_failed', message: e.message } });
   }
 });
+
+// --- backward-compat aliases (in case frontend calls old paths) ---
+app.get('/v1/stats', async (_req, res) => {
+  try {
+    const s = await readCounter();
+    res.json(s); // { total_compressed, updated_at }
+  } catch (e) {
+    res.status(500).json({ error: { code: 'stats_read_failed', message: e.message } });
+  }
+});
+
+app.get('/v1/reviews', async (_req, res) => {
+  try {
+    const r = await readReviews();
+    const avg = r.count ? (r.sum / r.count) : 0;
+    res.json({
+      reviewCount: r.count,
+      ratingValue: Number(avg.toFixed(2)),
+      distribution: r.distribution,
+      updated_at: r.updated_at
+    });
+  } catch (e) {
+    res.status(500).json({ error: { code: 'reviews_read_failed', message: e.message } });
+  }
+});
+
 
 app.post('/v1/reviews', async (req, res) => {
   try {
