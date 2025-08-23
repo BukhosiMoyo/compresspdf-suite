@@ -13,6 +13,13 @@ import {
   X as IcX,
 } from "lucide-react";
 
+// ---- API base (Vite injects at build time)
+const API = import.meta.env.VITE_API_BASE || "";
+if (!API) console.warn("VITE_API_BASE is not set. On Vercel it should be https://api.compresspdf.co.za");
+// (optional) expose for quick console check:
+window.API = API;
+
+
 /* helpers */
 function useQuery() {
   const { search } = useLocation();
@@ -84,28 +91,41 @@ function EmailModal({ open, onClose, defaultName, defaultFrom, downloadUrl, file
   if (!open) return null;
 
   async function submit(e) {
-    e.preventDefault(); setBusy(true); setMsg("");
+    e.preventDefault();
+    setBusy(true);
+    setMsg("");
     try {
       const r = await fetch(`${API}/v1/email/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           from_name: fromName,
           from_email: fromEmail,
           to_email: toEmail,
-          file_url: downloadUrl,
+          file_url: downloadUrl, // can be relative; server makes it absolute
           file_name: fileName,
           tool: "merge",
         }),
-        credentials: "include",
       });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok) { setMsg("Sent! Check the recipient’s inbox."); setToEmail(""); }
-      else { setMsg(j?.error?.message || "Could not send email."); }
+
+      const ct = (r.headers.get("content-type") || "").toLowerCase();
+      const isJson = ct.includes("application/json");
+      const j = isJson ? await r.json().catch(() => ({})) : {};
+
+      if (r.ok) {
+        setMsg("Sent! Check the recipient’s inbox.");
+        setToEmail("");
+      } else {
+        setMsg(j?.error?.message || `Email failed (status ${r.status}).`);
+      }
     } catch (err) {
-      setMsg(err.message || "Network error.");
-    } finally { setBusy(false); }
+      setMsg(err?.message || "Network error.");
+    } finally {
+      setBusy(false);
+    }
   }
+
 
   return (
     <div className="modalOverlay" role="dialog" aria-modal="true">
