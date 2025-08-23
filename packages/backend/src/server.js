@@ -33,6 +33,8 @@ const allowlist = [
   'https://www.mergepdf.co.za',
   'https://compresspdf.co.za',
   'https://www.compresspdf.co.za',
+  'https://merge-pdf-react.vercel.app/',
+
 ];
 
 const corsOptions = {

@@ -86,7 +86,7 @@ function EmailModal({ open, onClose, defaultName, defaultFrom, downloadUrl, file
   async function submit(e) {
     e.preventDefault(); setBusy(true); setMsg("");
     try {
-      const r = await fetch(`${import.meta.env.VITE_API_BASE}/v1/share/email`, {
+      const r = await fetch(`${API}/v1/email/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -97,6 +97,7 @@ function EmailModal({ open, onClose, defaultName, defaultFrom, downloadUrl, file
           file_name: fileName,
           tool: "merge",
         }),
+        credentials: "include",
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok) { setMsg("Sent! Check the recipient’s inbox."); setToEmail(""); }

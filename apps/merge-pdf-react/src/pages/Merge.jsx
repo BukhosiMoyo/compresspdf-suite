@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 
-
 import {
   DndContext,
   closestCenter,
@@ -23,7 +22,7 @@ import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-/* lucide icons (consistent set) */
+/* lucide icons */
 import {
   Plus,
   ArrowUpDown,
@@ -35,6 +34,13 @@ import {
 
 const FILES_MAX = 20;
 const FILE_MAX_MB = 20;
+
+/** ✅ single source of truth for the API base */
+const API = import.meta.env.VITE_API_BASE || "";
+if (!API) {
+  // Won't break the app, but surfaces obvious misconfig during preview/dev
+  console.warn("VITE_API_BASE is not set. Set it to https://api.compresspdf.co.za on Vercel.");
+}
 
 /* ---------- Sortable Tile ---------- */
 function SortableTile({ id, file, thumb, pages, onRemove, onRotate }) {
@@ -66,7 +72,6 @@ function SortableTile({ id, file, thumb, pages, onRemove, onRotate }) {
           PDF
         </div>
 
-        {/* thumb + tooltip */}
         <div className="thumbTooltip">
           <div className="tooltip above">
             {size} • {pages ?? "…"} pages
@@ -82,7 +87,6 @@ function SortableTile({ id, file, thumb, pages, onRemove, onRotate }) {
               onClick={() => onRotate(id)}
               aria-label="Rotate file"
             >
-              {/* rotate kept for future */}
               <RotateCcw size={18} />
             </button>
             <div className="tooltip above">Rotate file</div>
@@ -94,7 +98,6 @@ function SortableTile({ id, file, thumb, pages, onRemove, onRotate }) {
               onClick={() => onRemove(id)}
               aria-label="Remove file"
             >
-              {/* ONLY the X (bolder stroke) */}
               <XIcon size={18} strokeWidth={2.5} />
             </button>
             <div className="tooltip above">Remove file</div>
@@ -112,7 +115,7 @@ function SortableTile({ id, file, thumb, pages, onRemove, onRotate }) {
 
 /* ---------- Bin/Undo ---------- */
 function BinOverlay({ count, onUndo, onUndoAll }) {
-  if (!count) return null; // render only when something is in the bin
+  if (!count) return null;
   return (
     <div className="binOverlay">
       <div className="bin hot" title="Deleted files bin">
@@ -217,8 +220,12 @@ export default function Merge() {
   }
 
   // intake files
+  function isPdf(f) {
+    return f?.type === "application/pdf" || /\.pdf$/i.test(f?.name || "");
+  }
+
   async function acceptFiles(fileList) {
-    const selected = Array.from(fileList || []).filter((f) => f.type === "application/pdf");
+    const selected = Array.from(fileList || []).filter(isPdf);
     const accepted = [];
     let totalAfter = files.length;
     for (const f of selected) {
@@ -274,7 +281,6 @@ export default function Merge() {
   // sortable
   function onDragStart() {
     setDragging(true);
-    // lock page scroll while dragging tiles
     document.body.style.overflow = "hidden";
   }
   function onDragEnd(e) {
@@ -363,6 +369,10 @@ export default function Merge() {
   const [progress, setProgress] = useState({ pct: 0, speed: "" });
   async function handleMerge() {
     if (files.length < 2 || busy) return;
+    if (!API) {
+      alert("VITE_API_BASE is not set. Please set it to https://api.compresspdf.co.za");
+      return;
+    }
     setBusy(true);
 
     const fd = new FormData();
@@ -389,6 +399,11 @@ export default function Merge() {
       setProgress({ pct, speed });
       lastLoaded = e.loaded;
       lastT = now;
+    };
+
+    xhr.onerror = () => {
+      alert("Network error while contacting the merge API.");
+      setBusy(false);
     };
 
     xhr.onreadystatechange = () => {
@@ -428,7 +443,8 @@ export default function Merge() {
       setBusy(false);
     };
 
-    xhr.open("POST", import.meta.env.VITE_API_BASE + "/v1/pdf/merge");
+    xhr.open("POST", `${API}/v1/pdf/merge`);
+    xhr.withCredentials = true; // ✅ required for our CORS config
     xhr.send(fd);
   }
 
@@ -610,7 +626,7 @@ export default function Merge() {
         </div>
       )}
 
-      {/* Bin/Undo – only when there’s something to undo */}
+      {/* Bin/Undo */}
       <BinOverlay count={trash.length} onUndo={restoreOne} onUndoAll={restoreAll} />
     </Layout>
   );
