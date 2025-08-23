@@ -32,15 +32,18 @@ import {
   Trash2,
 } from "lucide-react";
 
+
 const FILES_MAX = 20;
 const FILE_MAX_MB = 20;
 
 /** ✅ single source of truth for the API base */
-const API = import.meta.env.VITE_API_BASE || "";
-if (!API) {
-  // Won't break the app, but surfaces obvious misconfig during preview/dev
-  console.warn("VITE_API_BASE is not set. Set it to https://api.compresspdf.co.za on Vercel.");
+/** ✅ single source of truth for the API base */
+const API = (import.meta?.env?.VITE_API_BASE || window.__VITE_API_BASE || "https://api.compresspdf.co.za").replace(/\/+$/, "");
+
+if (!import.meta?.env?.VITE_API_BASE) {
+  console.warn("VITE_API_BASE not set at build. Using fallback:", API);
 }
+
 
 /* ---------- Sortable Tile ---------- */
 function SortableTile({ id, file, thumb, pages, onRemove, onRotate }) {
