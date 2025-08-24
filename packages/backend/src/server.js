@@ -89,6 +89,17 @@ async function bumpTotal() {
   return s;
 }
 
+/* Path to a separate merge counter (distinct from total_compressed) */
+const MERGE_STATS_PATH = path.join(DATA_DIR, 'merge-stats.json');
+
+async function readMergeCounter() {
+  try {
+    return JSON.parse(await fsp.readFile(MERGE_STATS_PATH, 'utf8'));
+  } catch {
+    return { app: 'mergepdf', total: 0, updated_at: new Date().toISOString() };
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Reviews aggregate
 // ----------------------------------------------------------------------------
@@ -139,12 +150,16 @@ app.get('/v1/stats/summary', async (_req, res) => {
   catch (e) { res.status(500).json({ error: { code: 'stats_read_failed', message: e.message } }); }
 });
 
-// Merge PDF specific stats (what the frontend should use)
+// Merge PDF specific stats (what the frontend should use) — alias to a dedicated file
 app.get('/v1/mergepdf/stats/summary', async (_req, res) => {
-  try { res.json(await summaryMulti('mergepdf')); }
-  catch (e) { res.status(500).json({ error: { code: 'merge_stats_read_failed', message: e.message } }); }
+  try {
+    const s = await readMergeCounter();
+    res.json(s); // { app: 'mergepdf', total, updated_at }
+  } catch (e) {
+    res.status(500).json({ error: { code: 'merge_stats_read_failed', message: e.message } });
+  }
 });
-
+ 
 // Internal bump endpoint (optional: lets merge route increment via HTTP if needed)
 app.post('/v1/mergepdf/stats/bump', async (_req, res) => {
   try { res.json(await bumpMulti('mergepdf')); }
