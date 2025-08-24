@@ -27,7 +27,6 @@ const log = pino();
 
 // ----------------------------------------------------------------------------
 /** CORS allowlist (add future tool domains as you launch them) */
-// ----------------------------------------------------------------------------
 const allowlist = [
   'https://mergepdf.co.za',
   'https://www.mergepdf.co.za',
@@ -36,6 +35,11 @@ const allowlist = [
   'https://merge-pdf-react.vercel.app/',
 
 ];
+
+// Dev convenience: allow Vite on localhost
+if (process.env.NODE_ENV !== 'production') {
+  allowlist.push('http://localhost:5173', 'http://127.0.0.1:5173');
+}
 
 const corsOptions = {
   origin: (origin, cb) => {

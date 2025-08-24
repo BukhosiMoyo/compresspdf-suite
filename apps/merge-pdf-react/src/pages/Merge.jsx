@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
+import StatsAndFAQ from "../components/StatsAndFAQ.jsx";
 
 import {
   DndContext,
@@ -324,6 +325,8 @@ export default function Merge() {
   function restoreAll() {
     setTrash((prev) => {
       if (!prev.length) return prev;
+
+      // restore files
       setFiles((f) => [
         ...f,
         ...prev.map((x) => ({
@@ -334,6 +337,8 @@ export default function Merge() {
           fly: false,
         })),
       ]);
+
+      // restore thumbs
       setThumbs((th) => {
         const n = { ...th };
         prev.forEach((x) => {
@@ -341,6 +346,8 @@ export default function Merge() {
         });
         return n;
       });
+
+      // restore page counts
       setPageCounts((pc) => {
         const n = { ...pc };
         prev.forEach((x) => {
@@ -348,6 +355,7 @@ export default function Merge() {
         });
         return n;
       });
+
       return [];
     });
   }
@@ -445,6 +453,8 @@ export default function Merge() {
       alert(msg);
       setBusy(false);
     };
+    
+    console.log("POST →", import.meta.env.VITE_API_BASE + "/v1/pdf/merge");
 
     xhr.open("POST", `${API}/v1/pdf/merge`);
     xhr.withCredentials = true; // ✅ required for our CORS config
@@ -462,177 +472,178 @@ export default function Merge() {
         setLocale,
       }}
     >
-      <div className="appShell" style={{ height: "var(--app-height, auto)" }}>
-        {/* Work area (only this scrolls) */}
-        <div
-          ref={canvasRef}
-          className={`canvasArea dropzone ${dropActive ? "dropActive" : ""}`}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-        >
+      <div
+        className={`appShell ${!hasFiles ? "appShell--no-sidebar" : ""}`}
+        style={{ height: "var(--app-height, auto)" }}
+      >
+         <div
+           ref={canvasRef}
+           className={`canvasArea dropzone ${dropActive ? "dropActive" : ""}`}
+           onDragOver={onDragOver}
+           onDragLeave={onDragLeave}
+           onDrop={onDrop}
+         >
           {!hasFiles ? (
-            <section className="zeroState">
-              <h1 className="titleClamp">Merge PDF files</h1>
-              <p className="subtleClamp">
-                Combine PDFs in the order you want. Drag &amp; drop or click the big button.
-              </p>
-              <button className="ctaHuge pulseBorderGreen" onClick={() => inputRef.current?.click()}>
-                <span className="btnIcon">
-                  <Plus size={18} />
-                </span>
-                <span className="btnLabel">Select PDF files</span>
-              </button>
-              <p className="dropHint">or drop PDFs here</p>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="application/pdf"
-                multiple
-                onChange={onPick}
-                hidden
-              />
-            </section>
-          ) : (
             <>
-              {/* Controls (collapse to icons on scroll) */}
-              <div className={`controlsRow ${controlsCompact ? "controlsRow--compact" : ""}`}>
-                <div className="tooltipHost">
-                  <button
-                    className="btnGhost btnAdd btnAdd--pulse"
-                    onClick={() => inputRef.current?.click()}
-                  >
-                    <span className="btnIcon">
-                      <Plus size={18} />
-                    </span>
-                    <span className="btnLabel">
-                      {files.length} file{files.length === 1 ? "" : "s"} added
-                    </span>
-                  </button>
-                  <div className="tooltip bottom">Add more files</div>
-                </div>
+              <section className="zeroState">
+                <h1 className="titleClamp">Merge PDF files</h1>
+                <p className="subtleClamp">
+                  Combine PDFs in the order you want. Drag &amp; drop or click the big button.
+                </p>
+                <button className="ctaHuge pulseBorderGreen" onClick={() => inputRef.current?.click()}>
+                  <span className="btnIcon">
+                    <Plus size={18} />
+                  </span>
+                  <span className="btnLabel">Select PDF files</span>
+                </button>
+                <p className="dropHint">or drop PDFs here</p>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="application/pdf"
+                  multiple
+                  onChange={onPick}
+                  hidden
+                />
+              </section>
 
-                <div className="tooltipHost">
-                  <button className="btnGhost btnGhost--outlined2" onClick={toggleSort}>
-                    <span className="btnIcon">
-                      <ArrowUpDown size={18} />
-                    </span>
-                    <span className="btnLabel">A↕Z</span>
-                  </button>
-                  <div className="tooltip bottom">Sort A→Z</div>
-                </div>
-
-                <div className="tooltipHost">
-                  <button className="btnGhost btnGhost--outlined2" onClick={restoreOriginal}>
-                    <span className="btnIcon">
-                      <RotateCcw size={18} />
-                    </span>
-                    <span className="btnLabel">Original</span>
-                  </button>
-                  <div className="tooltip bottom">Revert to original</div>
-                </div>
-              </div>
-
-              {/* Grid */}
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-              >
-                <SortableContext items={files.map((f) => f.id)} strategy={rectSortingStrategy}>
-                  <div
-                    className={`tilesGrid ${dragging ? "dragging" : ""} ${
-                      shuffleKey ? "shuffleAnim" : ""
-                    }`}
-                  >
-                    {files.map(({ id, file, fly }) => (
-                      <div key={id} className={fly ? "flyOut" : ""}>
-                        <SortableTile
-                          id={id}
-                          file={file}
-                          thumb={thumbs[id]}
-                          pages={pageCounts[id]}
-                          onRemove={removeById}
-                          onRotate={() => {}}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-
-              <input
-                ref={inputRef}
-                type="file"
-                accept="application/pdf"
-                multiple
-                onChange={onPick}
-                hidden
-              />
+              {/* Counter + FAQs on the empty step */}
+              <StatsAndFAQ />
             </>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <aside className="sidebarPane">
-          <div className="tipCard">
-            <h3>Tips</h3>
-            {!hasFiles ? (
-              <p>
-                Drag &amp; drop PDFs or click “Select PDF files”. You can merge up to {FILES_MAX} PDFs
-                (max {FILE_MAX_MB}MB each).
-              </p>
-            ) : (
+          ) : (
+             <>
+               {/* Controls (collapse to icons on scroll) */}
+               <div className={`controlsRow ${controlsCompact ? "controlsRow--compact" : ""}`}>
+                 <div className="tooltipHost">
+                   <button
+                     className="btnGhost btnAdd btnAdd--pulse"
+                     onClick={() => inputRef.current?.click()}
+                   >
+                     <span className="btnIcon">
+                       <Plus size={18} />
+                     </span>
+                     <span className="btnLabel">
+                       {files.length} file{files.length === 1 ? "" : "s"} added
+                     </span>
+                   </button>
+                   <div className="tooltip bottom">Add more files</div>
+                 </div>
+ 
+                 <div className="tooltipHost">
+                   <button className="btnGhost btnGhost--outlined2" onClick={toggleSort}>
+                     <span className="btnIcon">
+                       <ArrowUpDown size={18} />
+                     </span>
+                     <span className="btnLabel">A↕Z</span>
+                   </button>
+                   <div className="tooltip bottom">Sort A→Z</div>
+                 </div>
+ 
+                 <div className="tooltipHost">
+                   <button className="btnGhost btnGhost--outlined2" onClick={restoreOriginal}>
+                     <span className="btnIcon">
+                       <RotateCcw size={18} />
+                     </span>
+                     <span className="btnLabel">Original</span>
+                   </button>
+                   <div className="tooltip bottom">Revert to original</div>
+                 </div>
+               </div>
+ 
+               {/* Grid */}
+               <DndContext
+                 sensors={sensors}
+                 collisionDetection={closestCenter}
+                 onDragStart={onDragStart}
+                 onDragEnd={onDragEnd}
+               >
+                 <SortableContext items={files.map((f) => f.id)} strategy={rectSortingStrategy}>
+                   <div
+                     className={`tilesGrid ${dragging ? "dragging" : ""} ${
+                       shuffleKey ? "shuffleAnim" : ""
+                     }`}
+                   >
+                     {files.map(({ id, file, fly }) => (
+                       <div key={id} className={fly ? "flyOut" : ""}>
+                         <SortableTile
+                           id={id}
+                           file={file}
+                           thumb={thumbs[id]}
+                           pages={pageCounts[id]}
+                           onRemove={removeById}
+                           onRotate={() => {}}
+                         />
+                       </div>
+                     ))}
+                   </div>
+                 </SortableContext>
+               </DndContext>
+ 
+               <input
+                 ref={inputRef}
+                 type="file"
+                 accept="application/pdf"
+                 multiple
+                 onChange={onPick}
+                 hidden
+               />
+             </>
+           )}
+         </div>
+ 
+        {/* Sidebar: only render when there are files */}
+        {hasFiles ? (
+          <aside className="sidebarPane">
+            <div className="tipCard">
+              <h3>Tips</h3>
               <p>Drag tiles to reorder. Use A↕Z to sort by name. Original restores first‑added order.</p>
-            )}
-          </div>
-
-          <div className="sidebarCTA">
-            <button
-              className={`ctaMerge ${hasFiles && files.length >= 2 && !busy ? "pulseBorderGreen" : ""}`}
-              disabled={!hasFiles || busy || files.length < 2}
-              onClick={handleMerge}
-            >
-              Merge PDF
-            </button>
-          </div>
-        </aside>
-      </div>
-
-      {/* Drag overlay */}
-      {dropActive && (
-        <div
-          className="dropOverlay"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          onDragLeave={() => setDropActive(false)}
-        >
-          <div className="dropOverlayInner">
-            <div className="bigCatch">Drop it like it’s smart 🧠</div>
-            <div className="smallCatch">Release to add your PDFs</div>
-          </div>
-        </div>
-      )}
-
-      {/* Merge progress */}
-      {busy && (
-        <div className="loadingOverlay">
-          <div className="loadingCard">
-            <div className="ring">
-              <div className="ringInner" style={{ "--pct": `${progress.pct || 0}%` }} />
-              <div className="ringText">{progress.pct || 0}%</div>
             </div>
-            <div className="mergeMsg">Merging PDFs…</div>
-            <div className="mergeSpeed">{progress.speed}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Bin/Undo */}
-      <BinOverlay count={trash.length} onUndo={restoreOne} onUndoAll={restoreAll} />
-    </Layout>
-  );
+            <div className="sidebarCTA">
+              <button
+                className={`ctaMerge ${files.length >= 2 && !busy ? "pulseBorderGreen" : ""}`}
+                disabled={busy || files.length < 2}
+                onClick={handleMerge}
+              >
+                Merge PDF
+              </button>
+            </div>
+          </aside>
+        ) : null}
+       </div>
+ 
+       {/* Drag overlay */}
+       {dropActive && (
+         <div
+           className="dropOverlay"
+           onDragOver={(e) => e.preventDefault()}
+           onDrop={onDrop}
+           onDragLeave={() => setDropActive(false)}
+         >
+           <div className="dropOverlayInner">
+             <div className="bigCatch">Drop it like it’s smart 🧠</div>
+             <div className="smallCatch">Release to add your PDFs</div>
+           </div>
+         </div>
+       )}
+ 
+       {/* Merge progress */}
+       {busy && (
+         <div className="loadingOverlay">
+           <div className="loadingCard">
+             <div className="ring">
+               <div className="ringInner" style={{ "--pct": `${progress.pct || 0}%` }} />
+               <div className="ringText">{progress.pct || 0}%</div>
+             </div>
+             <div className="mergeMsg">Merging PDFs…</div>
+             <div className="mergeSpeed">{progress.speed}</div>
+           </div>
+         </div>
+       )}
+ 
+       {/* Bin/Undo */}
+       <BinOverlay count={trash.length} onUndo={restoreOne} onUndoAll={restoreAll} />
+     </Layout>
+   );
 }
 
 /* util */

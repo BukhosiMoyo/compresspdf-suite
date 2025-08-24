@@ -1,8 +1,10 @@
+// src/pages/Download.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import RatingDialog from "../components/RatingDialog.jsx";
 import { useLocale } from "../state/LocaleContext.jsx";
+import StatsAndFAQ from "../components/StatsAndFAQ.jsx"; // ⬅️ add this import
 import {
   Download as IcDownload,
   Link2 as IcLink,
@@ -12,13 +14,6 @@ import {
   Send as IcSend,
   X as IcX,
 } from "lucide-react";
-
-// ---- API base (Vite injects at build time)
-const API = import.meta.env.VITE_API_BASE || "";
-if (!API) console.warn("VITE_API_BASE is not set. On Vercel it should be https://api.compresspdf.co.za");
-// (optional) expose for quick console check:
-window.API = API;
-
 
 /* helpers */
 function useQuery() {
@@ -91,41 +86,28 @@ function EmailModal({ open, onClose, defaultName, defaultFrom, downloadUrl, file
   if (!open) return null;
 
   async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
-    setMsg("");
+    e.preventDefault(); setBusy(true); setMsg("");
     try {
-      const r = await fetch(`${API}/v1/email/send`, {
+      const r = await fetch(`${import.meta.env.VITE_API_BASE}/v1/email/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           from_name: fromName,
           from_email: fromEmail,
           to_email: toEmail,
-          file_url: downloadUrl, // can be relative; server makes it absolute
+          file_url: downloadUrl,
           file_name: fileName,
           tool: "merge",
         }),
+        credentials: "include",
       });
-
-      const ct = (r.headers.get("content-type") || "").toLowerCase();
-      const isJson = ct.includes("application/json");
-      const j = isJson ? await r.json().catch(() => ({})) : {};
-
-      if (r.ok) {
-        setMsg("Sent! Check the recipient’s inbox.");
-        setToEmail("");
-      } else {
-        setMsg(j?.error?.message || `Email failed (status ${r.status}).`);
-      }
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { setMsg("Sent! Check the recipient’s inbox."); setToEmail(""); }
+      else { setMsg(j?.error?.message || "Could not send email."); }
     } catch (err) {
-      setMsg(err?.message || "Network error.");
-    } finally {
-      setBusy(false);
-    }
+      setMsg(err.message || "Network error.");
+    } finally { setBusy(false); }
   }
-
 
   return (
     <div className="modalOverlay" role="dialog" aria-modal="true">
@@ -162,7 +144,6 @@ export default function Download() {
   const url = q.get("url") || "";
   const name = q.get("name") || "merged.pdf";
 
-  // 🔗 use global locale (no more local state here)
   const { locale, setLocale } = useLocale();
   const t = STRINGS[locale] || STRINGS.en;
 
@@ -224,11 +205,12 @@ export default function Download() {
       headerProps={{
         theme,
         onToggleTheme: toggleTheme,
-        locale,      // ✅ pass global locale so header shows the current value
-        setLocale,   // ✅ pass setter so changing it updates the global store
+        locale,
+        setLocale,
       }}
     >
-      <main className="downloadWrap downloadWrap--single">
+      {/* ⬇️ single-column wrapper instead of .appShell/grid */}
+      <main className="downloadStack">
         <section className="dlCard">
           <div className="dlPeel"><IcDownload size={18} /></div>
 
@@ -256,11 +238,15 @@ export default function Download() {
             <button className="btnGhost" onClick={() => nav("/", { replace: true })}>
               <IcHome size={16} /> {t.new}
             </button>
-            <button className="btnGhost" onClick={() => setEmailOpen(true)}>
+            {/* Email flow can stay hidden/disabled if SMTP is not ready */}
+            {/* <button className="btnGhost" onClick={() => setEmailOpen(true)}>
               <IcSend size={16} /> {t.email}
-            </button>
+            </button> */}
           </div>
         </section>
+
+        {/* ⬇️ Counter + FAQ stacked BELOW the card */}
+        <StatsAndFAQ />
       </main>
 
       <EmailModal

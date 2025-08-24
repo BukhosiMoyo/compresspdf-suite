@@ -1,27 +1,21 @@
+// src/components/SiteHeader.jsx
 import React from "react";
 import { Sun, Moon, Globe } from "lucide-react";
 import { useLocale } from "../state/LocaleContext.jsx";
 
-/**
- * SiteHeader reads locale from context by default.
- * If `locale`/`setLocale` are passed via props, those win.
- * Theme can be controlled via props or it will manage itself.
- */
 export default function SiteHeader({
   theme,
   onToggleTheme,
   locale: localeProp,
   setLocale: setLocaleProp,
 }) {
-  // Locale (context as default)
-  const { locale: ctxLocale, setLocale: ctxSetLocale, t } = useLocale();
+  const { locale: ctxLocale, setLocale: ctxSetLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
   const setLocale = setLocaleProp ?? ctxSetLocale;
 
-  // Theme (self-manage if not provided)
-  const [internalTheme, setInternalTheme] = React.useState(() => {
-    return document.documentElement.getAttribute("data-theme") || "light";
-  });
+  const [internalTheme, setInternalTheme] = React.useState(
+    () => document.documentElement.getAttribute("data-theme") || "light"
+  );
   const currentTheme = theme ?? internalTheme;
   const toggleTheme =
     onToggleTheme ??
@@ -32,18 +26,39 @@ export default function SiteHeader({
       localStorage.setItem("theme", next);
     });
 
+  const stackedLogoSrc =
+    (currentTheme || "").toLowerCase() === "dark"
+      ? "/logo/merge-logo-wide-dark.png"
+      : "/logo/merge-logo-wide-light.png";
+
   return (
     <header className="siteHeader">
       <div className="headerInner">
         {/* Brand (link home) */}
         <a href="/" className="brand" aria-label="Merge PDF — Home">
-          <div className="brandMark">M</div>
-          <div>Match PDF</div> {/* <- stays fixed, per your request */}
+          {/* Light logo */}
+          <img
+            src="/logo/merge-logo-wide-light.png"
+            className="brandImg logo-light"
+            alt="Merge PDF logo"
+            height={40}
+          />
+          {/* Dark logo */}
+          <img
+            src="/logo/merge-logo-wide-dark.png"
+            className="brandImg logo-dark"
+            alt="Merge PDF logo"
+            height={40}
+          />
+          {/* Accessible name for SEO/screen readers; visually hidden */}
+          <span style={{
+            position:'absolute', width:1, height:1, margin:-1, padding:0,
+            overflow:'hidden', clip:'rect(0 0 0 0)', border:0
+          }}>Merge PDF</span>
         </a>
 
 
         <div className="headerRight">
-          {/* Language */}
           <label className="langWrap" aria-label="Change language">
             <Globe size={16} aria-hidden />
             <select
@@ -58,7 +73,6 @@ export default function SiteHeader({
             </select>
           </label>
 
-          {/* Theme toggle */}
           <button
             type="button"
             className="themeToggle"
