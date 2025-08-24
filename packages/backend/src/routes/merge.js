@@ -7,6 +7,7 @@ import fssync from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
+import { bump as bumpMulti } from '../stats-multi.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,6 +58,18 @@ mergeRouter.post("/merge", upload.array("files[]", 50), async (req, res) => {
     // Build absolute URL so the frontend doesn't hit Vite by accident
     const rel = `/outputs/${filename}`;
     const absolute_url = `${req.protocol}://${req.get("host")}${rel}`;
+    try {
+      // Prefer direct import if available, otherwise POST to the internal bump endpoint
+      if (typeof bumpMulti === 'function') {
+        await bumpMulti('mergepdf');
+      } else {
+        // server-side HTTP bump (non-fatal). Uses PORT env or 4000 default.
+        await fetch(`http://127.0.0.1:${process.env.PORT || 4000}/v1/mergepdf/stats/bump`, { method: 'POST' });
+      }
+    } catch (e) { /* non-fatal */ }
+
+    if (typeof bumpMergeTotal === 'function') await bumpMergeTotal();
+
     return res.json({ output: { download_url: absolute_url } });
   } catch (err) {
     console.error("merge failed", err);

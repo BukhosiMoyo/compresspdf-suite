@@ -9,9 +9,9 @@ function useStats() {
     let alive = true;
     (async () => {
       try {
-        const r = await fetch(`${API}/v1/stats/summary`, { credentials: "include" });
+        const r = await fetch(`${API}/v1/mergepdf/stats/summary`, { credentials: "include" });
         const j = await r.json().catch(() => ({}));
-        if (alive && j?.total_compressed != null) setCount(j.total_compressed);
+        if (alive && j?.total != null) setCount(j.total);
       } catch {
         /* noop */
       }

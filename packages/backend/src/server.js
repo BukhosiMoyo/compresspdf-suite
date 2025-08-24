@@ -14,6 +14,7 @@ import { promises as fsp } from 'fs';
 
 import { mergeRouter } from './routes/merge.js';
 import { emailRouter } from './routes/email.js';
+import { bump as bumpMulti, summary as summaryMulti } from './stats-multi.js';
 
 dotenv.config();
 
@@ -136,6 +137,18 @@ app.get('/health', (_req, res) => {
 app.get('/v1/stats/summary', async (_req, res) => {
   try { res.json(await readCounter()); }
   catch (e) { res.status(500).json({ error: { code: 'stats_read_failed', message: e.message } }); }
+});
+
+// Merge PDF specific stats (what the frontend should use)
+app.get('/v1/mergepdf/stats/summary', async (_req, res) => {
+  try { res.json(await summaryMulti('mergepdf')); }
+  catch (e) { res.status(500).json({ error: { code: 'merge_stats_read_failed', message: e.message } }); }
+});
+
+// Internal bump endpoint (optional: lets merge route increment via HTTP if needed)
+app.post('/v1/mergepdf/stats/bump', async (_req, res) => {
+  try { res.json(await bumpMulti('mergepdf')); }
+  catch (e) { res.status(500).json({ error: { code: 'merge_stats_bump_failed', message: e.message } }); }
 });
 
 app.get('/v1/reviews/summary', async (_req, res) => {
@@ -386,6 +399,11 @@ app.post('/v1/jobs/zip', express.json(), async (req, res) => {
 // ----------------------------------------------------------------------------
 app.use('/v1/pdf', mergeRouter);
 app.use('/v1/email', emailRouter);
+
+// Export a tiny bump hook so other server modules/routes can call it directly
+export async function bumpMergePdf() {
+  return bumpMulti('mergepdf');
+}
 
 // ----------------------------------------------------------------------------
 // Cleanup expired temp files

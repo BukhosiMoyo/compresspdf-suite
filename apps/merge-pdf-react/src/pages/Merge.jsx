@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import StatsAndFAQ from "../components/StatsAndFAQ.jsx";
 
+
 import {
   DndContext,
   closestCenter,
