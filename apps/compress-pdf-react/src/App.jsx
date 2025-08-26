@@ -228,7 +228,7 @@ function StatCompressedTotal() {
 
   useEffect(() => {
     let alive = true;
-    fetch(`${API_BASE}/v1/stats/summary`, { credentials: 'include' })
+    fetch(`${API_BASE}/v1/compress-pdf/stats`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('bad_response'))))
       .then((s) => {
         if (alive) setTotal(s.total_compressed || 0);
@@ -368,9 +368,13 @@ export default function App() {
   useEffect(() => {
     async function fetchReviewStats() {
       try {
-        const res = await fetch("/v1/reviews/summary");
+        const res = await fetch(`${API_BASE}/v1/compress-pdf/reviews`);
         const data = await res.json();
-        setReviewStats(data);
+        // Map new API response to expected format
+        setReviewStats({
+          count: data.reviewCount || 0,
+          average: data.ratingValue || 5
+        });
       } catch (e) {
         console.error("Failed to fetch review stats", e);
       }

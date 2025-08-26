@@ -18,7 +18,7 @@
   "bugs": {
     "url": "https://github.com/BukhosiMoyo/ToolSuite/issues"
   },
-  "homepage": "https://github.com/BukhosiMoyo/ToolSuite#readme"
+  "homepage": "https://github.com/BukhosiMoyo/ToolSuite#readme",
   "dependencies": {
     "archiver": "^7.0.1",
     "cors": "^2.8.5",

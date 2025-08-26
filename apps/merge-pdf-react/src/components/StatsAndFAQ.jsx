@@ -1,19 +1,27 @@
 // src/components/StatsAndFAQ.jsx
 import React, { useEffect, useMemo, useState } from "react";
 
-const API = import.meta.env.VITE_API_BASE || "";
+const API = import.meta.env.VITE_API_BASE || "http://localhost:4000";
 
 function useStats() {
   const [count, setCount] = useState(null);
   useEffect(() => {
     let alive = true;
+    console.log("🔍 Stats: Starting API call to:", `${API}/v1/merge-pdf/stats`);
     (async () => {
       try {
-        const r = await fetch(`${API}/v1/mergepdf/stats/summary`, { credentials: "include" });
+        const r = await fetch(`${API}/v1/merge-pdf/stats`, { credentials: "include" });
+        console.log("🔍 Stats: Response status:", r.status, r.ok);
         const j = await r.json().catch(() => ({}));
-        if (alive && j?.total != null) setCount(j.total);
-      } catch {
-        /* noop */
+        console.log("🔍 Stats: Response data:", j);
+        if (alive && j?.total_merged != null) {
+          console.log("🔍 Stats: Setting count to:", j.total_merged);
+          setCount(j.total_merged);
+        } else {
+          console.log("🔍 Stats: No total_merged in response");
+        }
+      } catch (error) {
+        console.error("🔍 Stats: Error:", error);
       }
     })();
     return () => {
@@ -29,7 +37,7 @@ function useReviews() {
     let alive = true;
     (async () => {
       try {
-        const r = await fetch(`${API}/v1/reviews/summary`, { credentials: "include" });
+        const r = await fetch(`${API}/v1/merge-pdf/reviews`, { credentials: "include" });
         const j = await r.json().catch(() => ({}));
         if (alive && j?.reviewCount != null) {
           setAgg({
@@ -82,8 +90,10 @@ function FAQSchema({ faqs, agg }) {
 }
 
 export default function StatsAndFAQ() {
+  console.log("🔍 StatsAndFAQ: Component rendering, API =", API);
   const total = useStats();
   const agg = useReviews();
+  console.log("🔍 StatsAndFAQ: total =", total, "agg =", agg);
 
   const faqs = [
     {

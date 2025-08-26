@@ -39,11 +39,10 @@ const FILES_MAX = 20;
 const FILE_MAX_MB = 20;
 
 /** ✅ single source of truth for the API base */
-/** ✅ single source of truth for the API base */
-const API = (import.meta?.env?.VITE_API_BASE || window.__VITE_API_BASE || "https://api.compresspdf.co.za").replace(/\/+$/, "");
+const API = import.meta.env.VITE_API_BASE || "http://localhost:4000";
 
-if (!import.meta?.env?.VITE_API_BASE) {
-  console.warn("VITE_API_BASE not set at build. Using fallback:", API);
+if (!import.meta.env.VITE_API_BASE) {
+  console.warn("VITE_API_BASE not set. Using fallback:", API);
 }
 
 
@@ -610,6 +609,25 @@ export default function Merge() {
             </div>
           </aside>
         ) : null}
+        
+                 {/* Mobile Tips Toggle Button */}
+         {hasFiles && (
+           <button
+             className="mobileTipsToggle"
+             onClick={() => {
+               const sidebar = document.querySelector('.sidebarPane');
+               const button = document.querySelector('.mobileTipsToggle');
+               if (sidebar && button) {
+                 sidebar.classList.toggle('sidebarPane--show-tips');
+                 button.classList.toggle('active');
+               }
+             }}
+             title="Toggle tips"
+             aria-label="Toggle tips"
+           >
+             👁
+           </button>
+         )}
        </div>
  
        {/* Drag overlay */}

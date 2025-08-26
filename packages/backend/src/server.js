@@ -91,14 +91,15 @@ async function bumpTotal() {
   return s;
 }
 
-/* Path to a separate merge counter (distinct from total_compressed) */
-const MERGE_STATS_PATH = path.join(DATA_DIR, 'merge-stats.json');
+/* Path to multi-tool stats */
+const MERGE_STATS_PATH = path.join(DATA_DIR, 'stats-multi.json');
 
 async function readMergeCounter() {
   try {
-    return JSON.parse(await fsp.readFile(MERGE_STATS_PATH, 'utf8'));
+    const data = JSON.parse(await fsp.readFile(MERGE_STATS_PATH, 'utf8'));
+    return data.mergepdf || { total: 0, updated_at: new Date().toISOString() };
   } catch {
-    return { app: 'mergepdf', total: 0, updated_at: new Date().toISOString() };
+    return { total: 0, updated_at: new Date().toISOString() };
   }
 }
 
@@ -171,6 +172,11 @@ app.use((req, res, next) => {
       return next();
     }
     
+    // Allow requests from our local frontend (localhost:5173)
+    if (req.headers.origin && req.headers.origin.includes('localhost:5173')) {
+      return next();
+    }
+    
     // Block direct browser access to API endpoints
     if (req.path.startsWith('/v1/') || req.path.startsWith('/api/')) {
       return res.status(404).json({ 
@@ -196,27 +202,94 @@ app.get('/health', (_req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// Stats & reviews endpoints
+// Clear Tool-Specific Stats & Reviews Endpoints
 // ----------------------------------------------------------------------------
+
+// Compress PDF Tool Stats
+app.get('/v1/compress-pdf/stats', async (_req, res) => {
+  try { 
+    const s = await readCounter();
+    res.json({
+      tool: 'compress-pdf',
+      total_compressed: s.total_compressed,
+      updated_at: s.updated_at
+    });
+  }
+  catch (e) { res.status(500).json({ error: { code: 'compress_pdf_stats_failed', message: e.message } }); }
+});
+
+// Merge PDF Tool Stats
+app.get('/v1/merge-pdf/stats', async (_req, res) => {
+  try {
+    const s = await readMergeCounter();
+    res.json({
+      tool: 'merge-pdf',
+      total_merged: s.total,
+      updated_at: s.updated_at
+    });
+  } catch (e) {
+    res.status(500).json({ error: { code: 'merge_pdf_stats_failed', message: e.message } });
+  }
+});
+
+// Compress PDF Tool Reviews
+app.get('/v1/compress-pdf/reviews', async (_req, res) => {
+  try {
+    const r = await readReviews();
+    const avg = r.count ? (r.sum / r.count) : 0;
+    res.json({
+      tool: 'compress-pdf',
+      reviewCount: r.count,
+      ratingValue: Number(avg.toFixed(2)),
+      distribution: r.distribution,
+      updated_at: r.updated_at
+    });
+  } catch (e) {
+    res.status(500).json({ error: { code: 'compress_pdf_reviews_failed', message: e.message } });
+  }
+});
+
+// Merge PDF Tool Reviews (currently same as compress, but can be separated later)
+app.get('/v1/merge-pdf/reviews', async (_req, res) => {
+  try {
+    const r = await readReviews();
+    const avg = r.count ? (r.sum / r.count) : 0;
+    res.json({
+      tool: 'merge-pdf',
+      reviewCount: r.count,
+      ratingValue: Number(avg.toFixed(2)),
+      distribution: r.distribution,
+      updated_at: r.updated_at
+    });
+  } catch (e) {
+    res.status(500).json({ error: { code: 'merge_pdf_reviews_failed', message: e.message } });
+  }
+});
+
+// --- Backward Compatibility (keep old endpoints working) ---
 app.get('/v1/stats/summary', async (_req, res) => {
-  try { res.json(await readCounter()); }
+  try { 
+    const s = await readCounter();
+    res.json({
+      tool: 'compress-pdf',
+      total_compressed: s.total_compressed,
+      updated_at: s.updated_at
+    });
+  }
   catch (e) { res.status(500).json({ error: { code: 'stats_read_failed', message: e.message } }); }
 });
 
-// Merge PDF specific stats (what the frontend should use) — alias to a dedicated file
 app.get('/v1/mergepdf/stats/summary', async (_req, res) => {
   try {
     const s = await readMergeCounter();
-    res.json(s); // { app: 'mergepdf', total, updated_at }
+    res.json({
+      tool: 'merge-pdf',
+      total_merged: s.total,
+      updated_at: s.updated_at
+    });
   } catch (e) {
     res.status(500).json({ error: { code: 'merge_stats_read_failed', message: e.message } });
   }
-});
- 
-// Internal bump endpoint (optional: lets merge route increment via HTTP if needed)
-app.post('/v1/mergepdf/stats/bump', async (_req, res) => {
-  try { res.json(await bumpMulti('mergepdf')); }
-  catch (e) { res.status(500).json({ error: { code: 'merge_stats_bump_failed', message: e.message } }); }
 });
 
 app.get('/v1/reviews/summary', async (_req, res) => {
@@ -224,6 +297,7 @@ app.get('/v1/reviews/summary', async (_req, res) => {
     const r = await readReviews();
     const avg = r.count ? (r.sum / r.count) : 0;
     res.json({
+      tool: 'compress-pdf',
       reviewCount: r.count,
       ratingValue: Number(avg.toFixed(2)),
       distribution: r.distribution,
@@ -234,29 +308,21 @@ app.get('/v1/reviews/summary', async (_req, res) => {
   }
 });
 
-// --- backward-compat aliases (in case frontend calls old paths) ---
-app.get('/v1/stats', async (_req, res) => {
-  try {
-    const s = await readCounter();
-    res.json(s); // { total_compressed, updated_at }
-  } catch (e) {
-    res.status(500).json({ error: { code: 'stats_read_failed', message: e.message } });
+// Internal bump endpoints for stats tracking
+app.post('/v1/compress-pdf/stats/bump', async (_req, res) => {
+  try { 
+    const s = await bumpTotal();
+    res.json({ ok: true, new_total: s.total_compressed });
   }
+  catch (e) { res.status(500).json({ error: { code: 'compress_pdf_stats_bump_failed', message: e.message } }); }
 });
 
-app.get('/v1/reviews', async (_req, res) => {
-  try {
-    const r = await readReviews();
-    const avg = r.count ? (r.sum / r.count) : 0;
-    res.json({
-      reviewCount: r.count,
-      ratingValue: Number(avg.toFixed(2)),
-      distribution: r.distribution,
-      updated_at: r.updated_at
-    });
-  } catch (e) {
-    res.status(500).json({ error: { code: 'reviews_read_failed', message: e.message } });
+app.post('/v1/merge-pdf/stats/bump', async (_req, res) => {
+  try { 
+    const s = await bumpMulti('mergepdf');
+    res.json({ ok: true, new_total: s.total });
   }
+  catch (e) { res.status(500).json({ error: { code: 'merge_pdf_stats_bump_failed', message: e.message } }); }
 });
 
 

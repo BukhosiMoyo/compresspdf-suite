@@ -57,7 +57,9 @@ mergeRouter.post("/merge", upload.array("files[]", 50), async (req, res) => {
 
     // Build absolute URL so the frontend doesn't hit Vite by accident
     const rel = `/outputs/${filename}`;
-    const absolute_url = `${req.protocol}://${req.get("host")}${rel}`;
+    // For local development, use the backend URL directly
+    const host = process.env.NODE_ENV === 'production' ? req.get("host") : 'localhost:4000';
+    const absolute_url = `${req.protocol}://${host}${rel}`;
     try {
       // Prefer direct import if available, otherwise POST to the internal bump endpoint
       if (typeof bumpMulti === 'function') {
