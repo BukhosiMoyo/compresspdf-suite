@@ -1,9 +1,10 @@
-# ─── Node.js dependencies ───
+# ─── Dependencies ───
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+package-lock.json
 
 # ─── Build outputs ───
 dist/
@@ -11,26 +12,71 @@ build/
 .vite/
 .next/
 out/
+*.tsbuildinfo
 
-# ─── Env files ───
+# ─── Environment files ───
 .env
 .env.local
 .env.*.local
-# keep examples
+# Keep examples
 !.env.example
 
 # ─── Logs ───
 *.log
+logs/
+*.log.*
 
 # ─── OS files ───
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*~
 
-# ─── App runtime (backend specific) ───
+# ─── IDE files ───
+.vscode/
+.idea/
+*.sublime-*
+.atom/
+.brackets.json
+
+# ─── Runtime files ───
+# Backend specific
 packages/backend/tmp/
 packages/backend/uploads/
 packages/backend/data/
+packages/backend/outputs/
 
-# ─── CI/CD / Deployment ───
+# ─── Temporary files ───
+*.tmp
+*.temp
+.cache/
+.temp/
+
+# ─── Test files ───
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+
+# ─── CI/CD ───
 .vercel/
 .netlify/
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# ─── PDF files (development) ───
+*.pdf
+!README.pdf
+!docs/*.pdf
+
+# ─── Archives ───
+*.zip
+*.tar.gz
+*.rar
+
+# ─── Node.js ───
+.npm/
+.eslintcache
+.stylelintcache

@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Run from repo root: ~/tools-suite
-echo "Committing app changes…"
+echo "Committing Tool Suite Merge PDF app changes…"
 git add apps/merge-pdf-react
-git commit -m "Update merge-pdf-react app" || echo "No changes to commit."
+git commit -m "Update Tool Suite Merge PDF app" || echo "No changes to commit."
 
 echo "Rebuilding subtree branch…"
 git branch -D publish/merge-pdf-react 2>/dev/null || true

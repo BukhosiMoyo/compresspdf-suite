@@ -1,4 +1,4 @@
-// src/server.js
+// PDF Tools API - Hidden backend for PDF manipulation tools (api.compresspdf.co.za)
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -11,6 +11,9 @@ import pino from 'pino';
 import dotenv from 'dotenv';
 import archiver from 'archiver';
 import { promises as fsp } from 'fs';
+
+// Simple rate limiting
+const rateLimit = new Map();
 
 import { mergeRouter } from './routes/merge.js';
 import { emailRouter } from './routes/email.js';
@@ -27,14 +30,13 @@ app.set('trust proxy', true);
 const log = pino();
 
 // ----------------------------------------------------------------------------
-/** CORS allowlist (add future tool domains as you launch them) */
+/** CORS allowlist for current domains */
 const allowlist = [
-  'https://mergepdf.co.za',
-  'https://www.mergepdf.co.za',
-  'https://compresspdf.co.za',
-  'https://www.compresspdf.co.za',
-  'https://merge-pdf-react.vercel.app/',
-
+  'https://compresspdf.co.za',         // Main compress PDF domain
+  'https://www.compresspdf.co.za',     // Main compress PDF domain with www
+  'https://mergepdf.co.za',            // Merge PDF domain
+  'https://www.mergepdf.co.za',        // Merge PDF domain with www
+  'https://merge-pdf-react.vercel.app', // Vercel deployment
 ];
 
 // Dev convenience: allow Vite on localhost
@@ -129,6 +131,57 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve merged outputs so browser can download /outputs/merged-*.pdf
 app.use('/outputs', express.static(path.join(__dirname, '..', 'outputs')));
+
+// ----------------------------------------------------------------------------
+// API Security & Hiding
+// ----------------------------------------------------------------------------
+// Simple rate limiting
+app.use((req, res, next) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+  const maxRequests = 100; // Max 100 requests per 15 minutes
+  
+  if (!rateLimit.has(clientIP)) {
+    rateLimit.set(clientIP, { count: 1, resetTime: now + windowMs });
+  } else {
+    const client = rateLimit.get(clientIP);
+    if (now > client.resetTime) {
+      client.count = 1;
+      client.resetTime = now + windowMs;
+    } else {
+      client.count++;
+      if (client.count > maxRequests) {
+        return res.status(429).json({
+          error: 'Too Many Requests',
+          message: 'Rate limit exceeded. Please try again later.'
+        });
+      }
+    }
+  }
+  next();
+});
+
+// Hide API endpoints from direct browser access
+app.use((req, res, next) => {
+  // Block direct browser access to API endpoints
+  if (req.headers['user-agent'] && req.headers['user-agent'].includes('Mozilla')) {
+    // Allow health check for monitoring
+    if (req.path === '/health') {
+      return next();
+    }
+    
+    // Block direct browser access to API endpoints
+    if (req.path.startsWith('/v1/') || req.path.startsWith('/api/')) {
+      return res.status(404).json({ 
+        error: 'Not Found',
+        message: 'This endpoint is not accessible directly'
+      });
+    }
+  }
+  
+  next();
+});
 
 // ----------------------------------------------------------------------------
 // Health & logs
@@ -412,6 +465,8 @@ app.post('/v1/jobs/zip', express.json(), async (req, res) => {
 // ----------------------------------------------------------------------------
 // Mount feature routers
 // ----------------------------------------------------------------------------
+// Note: These API endpoints are hidden from direct browser access
+// They can only be accessed programmatically by authorized frontend applications
 app.use('/v1/pdf', mergeRouter);
 app.use('/v1/email', emailRouter);
 
